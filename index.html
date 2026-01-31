@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEURAL PONG — Adaptive AI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a25;
+  --border: #2a2a3a;
+  --text: #e0e0f0;
+  --text-dim: #6a6a8a;
+  --accent: #00f0ff;
+  --accent2: #7b61ff;
+  --accent3: #ff6b6b;
+  --success: #4ade80;
+  --warning: #facc15;
+  --glow: rgba(0, 240, 255, 0.15);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* LEFT PANEL - AI BRAIN */
+#ai-panel {
+  width: 280px;
+  min-width: 280px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px;
+  gap: 14px;
+}
+
+.panel-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.ai-thought {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+  line-height: 1.5;
+  min-height: 36px;
+}
+
+.ai-thought .prefix {
+  color: var(--text-dim);
+}
+
+/* Strategy indicator */
+.strategy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.strategy-aggressive { background: rgba(255,107,107,0.15); color: var(--accent3); border: 1px solid rgba(255,107,107,0.3); }
+.strategy-defensive { background: rgba(0,240,255,0.15); color: var(--accent); border: 1px solid rgba(0,240,255,0.3); }
+.strategy-predictive { background: rgba(123,97,255,0.15); color: var(--accent2); border: 1px solid rgba(123,97,255,0.3); }
+.strategy-adaptive { background: rgba(74,222,128,0.15); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Confidence bar */
+.confidence-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.confidence-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease, background 0.5s ease;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+
+/* Pattern list */
+.pattern-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.pattern-item:last-child { border: none; }
+
+.pattern-name { color: var(--text-dim); }
+.pattern-value { color: var(--text); font-weight: 600; }
+
+/* Mini heatmap */
+#heatmap-canvas {
+  width: 100%;
+  height: 80px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.3);
+}
+
+/* Prediction arrow */
+.prediction-vis {
+  height: 40px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#prediction-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent2);
+  box-shadow: 0 0 12px var(--accent2);
+  position: absolute;
+  transition: left 0.3s ease;
+}
+
+.prediction-track {
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+}
+
+/* GAME AREA */
+#game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+#game-area::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0,240,255,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Score display */
+#score-display {
+  position: absolute;
+  top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  z-index: 10;
+}
+
+.score-side {
+  text-align: center;
+}
+
+.score-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.score-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-player { color: var(--accent); }
+.score-ai { color: var(--accent2); }
+
+.score-divider {
+  width: 1px;
+  height: 50px;
+  background: var(--border);
+}
+
+/* Round indicator */
+#round-indicator {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+/* Canvas */
+#gameCanvas {
+  border-radius: 12px;
+  box-shadow: 0 0 60px rgba(0,0,0,0.5), inset 0 0 60px rgba(0,240,255,0.02);
+}
+
+/* Speed indicator */
+#speed-indicator {
+  position: absolute;
+  bottom: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.3s;
+}
+
+.speed-dot.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+/* RIGHT PANEL - STATS */
+#stats-panel {
+  width: 260px;
+  min-width: 260px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px;
+  gap: 14px;
+}
+
+/* Win rate chart */
+#winrate-canvas {
+  width: 100%;
+  height: 80px;
+  border-radius: 6px;
+}
+
+/* Log */
+.log-container {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.log-entry {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.log-entry .time { color: var(--text-dim); opacity: 0.5; }
+.log-entry .event { color: var(--accent); }
+.log-entry .adapt { color: var(--accent2); }
+.log-entry .warn { color: var(--accent3); }
+
+/* SPLASH SCREEN */
+#splash {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.6s ease;
+}
+
+#splash.hidden { opacity: 0; pointer-events: none; }
+
+.splash-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.splash-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 48px;
+}
+
+.splash-start {
+  font-family: 'JetBrains Mono', monospace;
+  padding: 14px 48px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.splash-start:hover {
+  background: rgba(0,240,255,0.1);
+  box-shadow: 0 0 30px rgba(0,240,255,0.2);
+  transform: translateY(-2px);
+}
+
+.splash-start::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.1), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+.splash-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 20px;
+  opacity: 0.5;
+}
+
+.splash-features {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 40px;
+}
+
+.splash-feature {
+  text-align: center;
+  max-width: 160px;
+}
+
+.splash-feature-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.splash-feature-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+  z-index: 2000;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Screen shake */
+.shake {
+  animation: shake 0.15s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0); }
+  25% { transform: translate(-3px, 2px); }
+  50% { transform: translate(3px, -2px); }
+  75% { transform: translate(-2px, -1px); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Responsive */
+@media (max-width: 1200px) {
+  #ai-panel { width: 240px; min-width: 240px; }
+  #stats-panel { width: 220px; min-width: 220px; }
+}
+
+@media (max-width: 900px) {
+  #ai-panel, #stats-panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+  <div class="splash-title">NEURAL PONG</div>
+  <div class="splash-sub">Adaptive AI Opponent</div>
+  <div class="splash-features">
+    <div class="splash-feature">
+      <div class="splash-feature-icon">🧠</div>
+      <div class="splash-feature-text">AI learns your patterns in real-time</div>
+    </div>
+    <div class="splash-feature">
+      <div class="splash-feature-icon">⚡</div>
+      <div class="splash-feature-text">Adapts strategy as you play</div>
+    </div>
+    <div class="splash-feature">
+      <div class="splash-feature-icon">📊</div>
+      <div class="splash-feature-text">Watch the AI think live</div>
+    </div>
+  </div>
+  <button class="splash-start" id="startBtn">PLAY</button>
+  <div class="splash-hint">Move mouse or arrow keys to control paddle</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <!-- LEFT: AI Brain -->
+  <div id="ai-panel">
+    <div class="panel-title">AI Neural Core</div>
+    
+    <div class="card">
+      <div class="card-label">Current Thought</div>
+      <div class="ai-thought" id="aiThought">
+        <span class="prefix">→ </span><span id="aiThoughtText">Initializing neural pathways...</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Active Strategy</div>
+      <div id="strategyBadge" class="strategy-badge strategy-adaptive">
+        <span id="strategyIcon">◈</span>
+        <span id="strategyName">CALIBRATING</span>
+      </div>
+      <div class="confidence-bar" style="margin-top:10px">
+        <div class="confidence-fill" id="confidenceFill" style="width:10%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px">
+        <span class="card-label" style="margin:0">Confidence</span>
+        <span class="card-label" style="margin:0" id="confidenceValue">10%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Prediction — Next Shot</div>
+      <div class="prediction-vis">
+        <div class="prediction-track"></div>
+        <div id="prediction-indicator"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span class="card-label" style="margin:0">Top</span>
+        <span class="card-label" style="margin:0" id="predAccuracy">—</span>
+        <span class="card-label" style="margin:0">Bottom</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Position Heatmap</div>
+      <canvas id="heatmap-canvas"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Detected Patterns</div>
+      <div id="patterns-list">
+        <div class="pattern-item">
+          <span class="pattern-name">Gathering data...</span>
+          <span class="pattern-value">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Neural Weights</div>
+      <canvas id="neural-canvas" width="248" height="100"></canvas>
+    </div>
+  </div>
+
+  <!-- CENTER: Game -->
+  <div id="game-area">
+    <div id="score-display">
+      <div class="score-side">
+        <div class="score-label">You</div>
+        <div class="score-num score-player" id="playerScore">0</div>
+      </div>
+      <div class="score-divider"></div>
+      <div class="score-side">
+        <div class="score-label">Neural AI</div>
+        <div class="score-num score-ai" id="aiScore">0</div>
+      </div>
+    </div>
+    <div id="round-indicator">ROUND 1</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="speed-indicator">
+      <span>SPEED</span>
+      <span class="speed-dot active"></span>
+      <span class="speed-dot"></span>
+      <span class="speed-dot"></span>
+      <span class="speed-dot"></span>
+      <span class="speed-dot"></span>
+    </div>
+  </div>
+
+  <!-- RIGHT: Stats -->
+  <div id="stats-panel">
+    <div class="panel-title">Match Analytics</div>
+
+    <div class="card">
+      <div class="card-label">Score</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="statRallies">0</div>
+          <div class="stat-label">Rallies</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statLongest">0</div>
+          <div class="stat-label">Longest Rally</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statTopSpeed">0</div>
+          <div class="stat-label">Top Speed</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statReaction">—</div>
+          <div class="stat-label">Avg React (ms)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">AI Win Rate Over Time</div>
+      <canvas id="winrate-canvas"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-label">AI Adaptation Level</div>
+      <div id="adaptLevel" style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--accent2);text-align:center;padding:8px 0;">LV.1</div>
+      <div class="confidence-bar">
+        <div class="confidence-fill" id="adaptBar" style="width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent3))"></div>
+      </div>
+      <div class="card-label" style="margin-top:6px;text-align:center" id="adaptDesc">Novice — Learning basics</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Your Tendencies</div>
+      <div id="tendency-list">
+        <div class="pattern-item">
+          <span class="pattern-name">No data yet</span>
+          <span class="pattern-value">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Event Log</div>
+      <div class="log-container" id="eventLog">
+        <div class="log-entry"><span class="time">00:00</span> <span class="event">System initialized</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// NEURAL PONG — Adaptive AI Game
+// ═══════════════════════════════════════════════
+
+// ─── Audio Engine (Web Audio API) ─────────────
+class AudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.initialized = false;
+  }
+
+  init() {
+    if (this.initialized) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.initialized = true;
+  }
+
+  play(type, freq = 440, dur = 0.1, vol = 0.15) {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+    
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, this.ctx.currentTime);
+    
+    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    
+    osc.start();
+    osc.stop(this.ctx.currentTime + dur);
+  }
+
+  hit() { this.play('triangle', 520, 0.08, 0.12); }
+  
+  wall() { this.play('sine', 280, 0.06, 0.08); }
+  
+  score(isPlayer) {
+    if (!this.ctx) return;
+    const freqs = isPlayer ? [523, 659, 784] : [400, 300, 200];
+    freqs.forEach((f, i) => {
+      setTimeout(() => this.play('triangle', f, 0.15, 0.1), i * 80);
+    });
+  }
+
+  adapt() { this.play('sine', 880, 0.2, 0.06); setTimeout(() => this.play('sine', 1100, 0.15, 0.04), 100); }
+  
+  powerHit() {
+    this.play('sawtooth', 220, 0.15, 0.08);
+    this.play('triangle', 660, 0.1, 0.1);
+  }
+}
+
+const audio = new AudioEngine();
+
+// ─── Particle System ──────────────────────────
+class Particle {
+  constructor(x, y, vx, vy, color, life = 1, size = 2) {
+    this.x = x; this.y = y;
+    this.vx = vx; this.vy = vy;
+    this.color = color;
+    this.life = life;
+    this.maxLife = life;
+    this.size = size;
+  }
+
+  update(dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.life -= dt;
+    this.vx *= 0.98;
+    this.vy *= 0.98;
+  }
+
+  draw(ctx) {
+    const alpha = Math.max(0, this.life / this.maxLife);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+class ParticleSystem {
+  constructor() { this.particles = []; }
+
+  emit(x, y, count, color, spread = 200, life = 0.6, size = 2.5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * spread;
+      this.particles.push(new Particle(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        color, life + Math.random() * 0.3, size
+      ));
+    }
+  }
+
+  trail(x, y, color) {
+    this.particles.push(new Particle(
+      x + (Math.random() - 0.5) * 4,
+      y + (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 20,
+      (Math.random() - 0.5) * 20,
+      color, 0.3, 1.5
+    ));
+  }
+
+  update(dt) {
+    this.particles = this.particles.filter(p => { p.update(dt); return p.life > 0; });
+  }
+
+  draw(ctx) {
+    this.particles.forEach(p => p.draw(ctx));
+  }
+}
+
+// ─── Adaptive AI Brain ────────────────────────
+class AIBrain {
+  constructor() {
+    // Position tracking (divide paddle zone into 10 segments)
+    this.segments = 10;
+    this.positionHeatmap = new Float32Array(this.segments);
+    this.hitPositions = [];       // where player hits the ball (y-positions)
+    this.reactionTimes = [];      // time from ball direction change to player movement
+    this.returnAngles = [];       // angles of player returns
+    
+    // Pattern detection
+    this.lastHits = [];           // last N hit positions (for sequence detection)
+    this.sequenceLength = 8;
+    
+    // Q-learning for positioning
+    this.qTable = {};             // state -> action values
+    this.learningRate = 0.15;
+    this.discount = 0.9;
+    this.epsilon = 0.3;           // exploration rate
+    
+    // Strategy state
+    this.strategy = 'calibrating';  // calibrating, aggressive, defensive, predictive, adaptive
+    this.confidence = 0.1;
+    this.adaptationLevel = 0;
+    this.totalHits = 0;
+    this.predictedY = 0.5;        // normalized predicted return position
+    this.predictionAccuracy = 0;
+    this.correctPredictions = 0;
+    this.totalPredictions = 0;
+    
+    // Tendency analysis
+    this.topHalf = 0;
+    this.bottomHalf = 0;
+    this.centerPlay = 0;
+    this.edgePlay = 0;
+    this.avgReturnPos = 0.5;
+    
+    // Timing
+    this.moveStartTime = 0;
+    this.lastBallDirChange = 0;
+    
+    // Neural weight visualization
+    this.weights = new Float32Array(24);
+    for (let i = 0; i < 24; i++) this.weights[i] = Math.random() * 0.5;
+    
+    this.thoughts = [];
+    this.currentThought = 'Initializing neural pathways...';
+  }
+
+  // Get discretized state for Q-learning
+  getState(ballY, ballVY, paddleY, canvasH) {
+    const by = Math.floor((ballY / canvasH) * 5);
+    const bvy = ballVY > 2 ? 2 : ballVY < -2 ? 0 : 1;
+    const py = Math.floor((paddleY / canvasH) * 5);
+    return `${by}_${bvy}_${py}`;
+  }
+
+  // Q-learning update
+  updateQ(state, action, reward, nextState) {
+    if (!this.qTable[state]) this.qTable[state] = [0, 0, 0]; // up, stay, down
+    if (!this.qTable[nextState]) this.qTable[nextState] = [0, 0, 0];
+    
+    const maxNext = Math.max(...this.qTable[nextState]);
+    this.qTable[state][action] += this.learningRate * 
+      (reward + this.discount * maxNext - this.qTable[state][action]);
+    
+    // Update visual weights
+    const wi = (action * 8 + Math.abs(state.hashCode ? state.hashCode() : state.length)) % 24;
+    this.weights[wi] = Math.min(1, this.weights[wi] + 0.05);
+  }
+
+  // Choose action using epsilon-greedy
+  chooseAction(state) {
+    if (Math.random() < this.epsilon) return Math.floor(Math.random() * 3);
+    if (!this.qTable[state]) return 1; // stay
+    const q = this.qTable[state];
+    return q.indexOf(Math.max(...q));
+  }
+
+  // Record player hit
+  recordHit(normalizedY, ballSpeed, angle) {
+    this.totalHits++;
+    this.hitPositions.push(normalizedY);
+    this.returnAngles.push(angle);
+    
+    // Update heatmap
+    const seg = Math.min(this.segments - 1, Math.floor(normalizedY * this.segments));
+    this.positionHeatmap[seg] += 1;
+    
+    // Track sequence
+    this.lastHits.push(normalizedY);
+    if (this.lastHits.length > this.sequenceLength) this.lastHits.shift();
+    
+    // Track tendency
+    if (normalizedY < 0.4) this.topHalf++;
+    else if (normalizedY > 0.6) this.bottomHalf++;
+    else this.centerPlay++;
+    
+    if (normalizedY < 0.2 || normalizedY > 0.8) this.edgePlay++;
+    
+    // Update prediction
+    this.updatePrediction();
+    
+    // Check prediction accuracy
+    if (this.totalPredictions > 0) {
+      const error = Math.abs(this.predictedY - normalizedY);
+      if (error < 0.2) this.correctPredictions++;
+      this.predictionAccuracy = this.correctPredictions / this.totalPredictions;
+    }
+    this.totalPredictions++;
+    
+    // Update strategy
+    this.updateStrategy();
+    
+    // Decay exploration
+    this.epsilon = Math.max(0.05, this.epsilon * 0.995);
+    
+    // Update neural weights randomly
+    for (let i = 0; i < 3; i++) {
+      const idx = Math.floor(Math.random() * 24);
+      this.weights[idx] = Math.min(1, this.weights[idx] + Math.random() * 0.1);
+    }
+  }
+
+  updatePrediction() {
+    if (this.lastHits.length < 3) {
+      this.predictedY = 0.5;
+      return;
+    }
+
+    // Weighted average of recent hits (more weight to recent)
+    let weightedSum = 0, weightTotal = 0;
+    for (let i = 0; i < this.lastHits.length; i++) {
+      const w = (i + 1) * (i + 1); // quadratic weighting
+      weightedSum += this.lastHits[i] * w;
+      weightTotal += w;
+    }
+    const trend = weightedSum / weightTotal;
+
+    // Detect patterns in hit sequence
+    const len = this.lastHits.length;
+    let patternPred = null;
+    
+    // Check for alternating pattern (top-bottom-top-bottom)
+    if (len >= 4) {
+      const diffs = [];
+      for (let i = 1; i < len; i++) diffs.push(this.lastHits[i] - this.lastHits[i-1]);
+      const alternating = diffs.every((d, i) => i === 0 || (d * diffs[i-1] < 0));
+      if (alternating) {
+        const lastDiff = diffs[diffs.length - 1];
+        patternPred = this.lastHits[len-1] - lastDiff * 0.7; // Counter-predict
+        this.setThought('Pattern detected: alternating returns. Counter-adjusting.');
+      }
+    }
+
+    // Check for drift (consistently going one direction)
+    if (len >= 5) {
+      const recentSlice = this.lastHits.slice(-5);
+      const increasing = recentSlice.every((v, i) => i === 0 || v >= recentSlice[i-1] - 0.05);
+      const decreasing = recentSlice.every((v, i) => i === 0 || v <= recentSlice[i-1] + 0.05);
+      
+      if (increasing) {
+        patternPred = Math.min(0.95, recentSlice[recentSlice.length-1] + 0.1);
+        this.setThought('Drift detected: player moving down. Pre-positioning.');
+      } else if (decreasing) {
+        patternPred = Math.max(0.05, recentSlice[recentSlice.length-1] - 0.1);
+        this.setThought('Drift detected: player moving up. Pre-positioning.');
+      }
+    }
+
+    // Blend predictions based on confidence
+    if (patternPred !== null && this.confidence > 0.3) {
+      this.predictedY = patternPred * this.confidence + trend * (1 - this.confidence);
+    } else {
+      this.predictedY = trend;
+    }
+
+    // Clamp
+    this.predictedY = Math.max(0.05, Math.min(0.95, this.predictedY));
+  }
+
+  updateStrategy() {
+    const oldStrategy = this.strategy;
+    
+    if (this.totalHits < 5) {
+      this.strategy = 'calibrating';
+      this.confidence = Math.min(0.3, this.totalHits * 0.06);
+    } else if (this.totalHits < 15) {
+      this.strategy = 'defensive';
+      this.confidence = Math.min(0.5, 0.3 + (this.totalHits - 5) * 0.02);
+    } else if (this.predictionAccuracy > 0.5) {
+      this.strategy = 'predictive';
+      this.confidence = Math.min(0.9, 0.5 + this.predictionAccuracy * 0.4);
+    } else if (this.totalHits > 30 && this.edgePlay > this.totalHits * 0.3) {
+      this.strategy = 'aggressive';
+      this.confidence = Math.min(0.85, 0.5 + (this.totalHits - 30) * 0.01);
+    } else {
+      this.strategy = 'adaptive';
+      this.confidence = Math.min(0.75, 0.4 + this.totalHits * 0.005);
+    }
+
+    // Adaptation level
+    this.adaptationLevel = Math.min(10, Math.floor(this.totalHits / 8) + 
+      (this.predictionAccuracy > 0.4 ? 2 : 0) +
+      (Object.keys(this.qTable).length > 20 ? 1 : 0));
+
+    if (oldStrategy !== this.strategy) {
+      this.setThought(`Strategy shift: ${oldStrategy} → ${this.strategy}`);
+      return true; // strategy changed
+    }
+    return false;
+  }
+
+  // Get AI paddle target position
+  getTargetY(ballY, ballVY, canvasH, ballX, canvasW, ballVX) {
+    let targetY;
+    
+    // Base: track ball
+    targetY = ballY;
+    
+    // If ball coming toward AI, predict landing position
+    if (ballVX > 0) {
+      const timeToReach = (canvasW - ballX) / Math.abs(ballVX);
+      let predY = ballY + ballVY * timeToReach;
+      
+      // Bounce prediction
+      while (predY < 0 || predY > canvasH) {
+        if (predY < 0) predY = -predY;
+        if (predY > canvasH) predY = 2 * canvasH - predY;
+      }
+      
+      targetY = predY;
+    }
+
+    // Apply strategy modifiers
+    switch (this.strategy) {
+      case 'calibrating':
+        // Slight delay/imperfection
+        targetY = targetY * 0.7 + (canvasH / 2) * 0.3;
+        break;
+        
+      case 'defensive':
+        // Bias toward center, react slower
+        targetY = targetY * 0.85 + (canvasH / 2) * 0.15;
+        break;
+        
+      case 'predictive':
+        // Use prediction to pre-position
+        if (ballVX < 0) { // Ball going toward player
+          targetY = this.predictedY * canvasH * 0.6 + (canvasH / 2) * 0.4;
+        }
+        break;
+        
+      case 'aggressive':
+        // Try to return to spots player can't reach
+        // Offset from predicted player position
+        if (this.confidence > 0.5) {
+          const playerPredPos = this.predictedY * canvasH;
+          // Aim away from where player tends to be
+          const offset = (playerPredPos > canvasH / 2) ? -30 : 30;
+          targetY += offset * this.confidence;
+        }
+        break;
+        
+      case 'adaptive':
+        // Mix of all strategies
+        const blend = this.predictedY * canvasH;
+        targetY = targetY * 0.6 + blend * 0.2 + (canvasH / 2) * 0.2;
+        break;
+    }
+
+    // Add slight imperfection based on inverse of adaptation level
+    const noise = (1 - this.adaptationLevel / 12) * 20;
+    targetY += (Math.random() - 0.5) * noise;
+
+    return Math.max(0, Math.min(canvasH, targetY));
+  }
+
+  // AI paddle speed scaling
+  getSpeed() {
+    const base = 4;
+    const levelBonus = this.adaptationLevel * 0.3;
+    const stratBonus = this.strategy === 'aggressive' ? 1 : this.strategy === 'predictive' ? 0.5 : 0;
+    return base + levelBonus + stratBonus;
+  }
+
+  setThought(text) {
+    this.currentThought = text;
+    this.thoughts.unshift(text);
+    if (this.thoughts.length > 50) this.thoughts.pop();
+  }
+
+  getPatterns() {
+    const patterns = [];
+    if (this.totalHits < 3) return [{ name: 'Gathering data...', value: '—' }];
+    
+    const topPct = Math.round(this.topHalf / this.totalHits * 100);
+    const botPct = Math.round(this.bottomHalf / this.totalHits * 100);
+    const cenPct = Math.round(this.centerPlay / this.totalHits * 100);
+    
+    patterns.push({ name: 'Top zone', value: `${topPct}%` });
+    patterns.push({ name: 'Center zone', value: `${cenPct}%` });
+    patterns.push({ name: 'Bottom zone', value: `${botPct}%` });
+    patterns.push({ name: 'Edge play', value: `${Math.round(this.edgePlay / this.totalHits * 100)}%` });
+    patterns.push({ name: 'Q-States', value: Object.keys(this.qTable).length });
+    
+    return patterns;
+  }
+
+  getTendencies() {
+    if (this.totalHits < 5) return [{ name: 'No data yet', value: '—' }];
+    
+    const tendencies = [];
+    const avgPos = this.hitPositions.reduce((a,b) => a+b, 0) / this.hitPositions.length;
+    
+    if (avgPos < 0.35) tendencies.push({ name: 'Bias', value: '↑ Upper' });
+    else if (avgPos > 0.65) tendencies.push({ name: 'Bias', value: '↓ Lower' });
+    else tendencies.push({ name: 'Bias', value: '◆ Neutral' });
+    
+    // Variance
+    const variance = this.hitPositions.reduce((sum, p) => sum + (p - avgPos) ** 2, 0) / this.hitPositions.length;
+    if (variance < 0.03) tendencies.push({ name: 'Style', value: 'Consistent' });
+    else if (variance > 0.08) tendencies.push({ name: 'Style', value: 'Chaotic' });
+    else tendencies.push({ name: 'Style', value: 'Balanced' });
+
+    // Reaction
+    if (this.reactionTimes.length > 3) {
+      const avgReact = this.reactionTimes.reduce((a,b) => a+b, 0) / this.reactionTimes.length;
+      tendencies.push({ name: 'Reaction', value: avgReact < 200 ? 'Fast' : avgReact < 400 ? 'Normal' : 'Slow' });
+    }
+    
+    // Predictability
+    tendencies.push({ name: 'Predictable', value: this.predictionAccuracy > 0.5 ? 'High ⚠' : this.predictionAccuracy > 0.3 ? 'Medium' : 'Low' });
+    
+    return tendencies;
+  }
+}
+
+// ─── Main Game ────────────────────────────────
+class Game {
+  constructor() {
+    this.canvas = document.getElementById('gameCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.particles = new ParticleSystem();
+    this.brain = new AIBrain();
+    
+    // Game dimensions
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    
+    // Game state
+    this.running = false;
+    this.playerScore = 0;
+    this.aiScore = 0;
+    this.round = 1;
+    this.rallyCount = 0;
+    this.currentRally = 0;
+    this.longestRally = 0;
+    this.topSpeed = 0;
+    this.gameTime = 0;
+    this.winHistory = []; // 1 = AI win, 0 = player win
+    
+    // Ball
+    this.ball = { x: 0, y: 0, vx: 0, vy: 0, speed: 5, radius: 6 };
+    
+    // Paddles
+    this.paddleW = 12;
+    this.paddleH = 80;
+    this.player = { y: 0, targetY: 0, speed: 7 };
+    this.ai = { y: 0, targetY: 0 };
+    
+    // Trail
+    this.ballTrail = [];
+    
+    // Input
+    this.mouseY = null;
+    this.keys = {};
+    
+    this.setupInput();
+    this.initHeatmapCanvas();
+    this.initWinrateCanvas();
+    
+    // Frame timing
+    this.lastTime = 0;
+    this.lastReactionCheck = 0;
+  }
+
+  resize() {
+    const area = document.getElementById('game-area');
+    const maxW = area.clientWidth - 40;
+    const maxH = area.clientHeight - 140;
+    const aspect = 16 / 10;
+    
+    let w = Math.min(maxW, 800);
+    let h = w / aspect;
+    if (h > maxH) { h = maxH; w = h * aspect; }
+    
+    this.canvas.width = Math.floor(w);
+    this.canvas.height = Math.floor(h);
+    this.W = this.canvas.width;
+    this.H = this.canvas.height;
+  }
+
+  setupInput() {
+    this.canvas.addEventListener('mousemove', e => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseY = ((e.clientY - rect.top) / rect.height) * this.H;
+    });
+    
+    document.addEventListener('mousemove', e => {
+      if (!this.mouseY) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.mouseY = ((e.clientY - rect.top) / rect.height) * this.H;
+      }
+    });
+    
+    document.addEventListener('keydown', e => this.keys[e.key] = true);
+    document.addEventListener('keyup', e => this.keys[e.key] = false);
+  }
+
+  resetBall(direction = 1) {
+    this.ball.x = this.W / 2;
+    this.ball.y = this.H / 2;
+    const angle = (Math.random() - 0.5) * Math.PI / 3;
+    this.ball.speed = 5 + this.brain.adaptationLevel * 0.3;
+    this.ball.vx = Math.cos(angle) * this.ball.speed * direction;
+    this.ball.vy = Math.sin(angle) * this.ball.speed;
+    this.ballTrail = [];
+    this.currentRally = 0;
+  }
+
+  start() {
+    audio.init();
+    this.player.y = this.H / 2;
+    this.ai.y = this.H / 2;
+    this.resetBall(Math.random() > 0.5 ? 1 : -1);
+    this.running = true;
+    this.lastTime = performance.now();
+    requestAnimationFrame(t => this.loop(t));
+  }
+
+  loop(time) {
+    if (!this.running) return;
+    
+    const dt = Math.min((time - this.lastTime) / 16.67, 3); // Normalize to ~60fps
+    this.lastTime = time;
+    this.gameTime += dt / 60;
+    
+    this.update(dt);
+    this.render();
+    
+    requestAnimationFrame(t => this.loop(t));
+  }
+
+  update(dt) {
+    // ── Player paddle ──
+    if (this.mouseY !== null) {
+      this.player.targetY = this.mouseY;
+    }
+    if (this.keys['ArrowUp'] || this.keys['w']) this.player.targetY -= this.player.speed * dt * 4;
+    if (this.keys['ArrowDown'] || this.keys['s']) this.player.targetY += this.player.speed * dt * 4;
+    
+    this.player.targetY = Math.max(this.paddleH / 2, Math.min(this.H - this.paddleH / 2, this.player.targetY));
+    this.player.y += (this.player.targetY - this.player.y) * 0.15 * dt;
+    
+    // ── AI paddle ──
+    const aiTarget = this.brain.getTargetY(
+      this.ball.y, this.ball.vy, this.ai.y, this.H,
+      this.ball.x, this.W, this.ball.vx
+    );
+    this.ai.targetY = Math.max(this.paddleH / 2, Math.min(this.H - this.paddleH / 2, aiTarget));
+    const aiSpeed = this.brain.getSpeed();
+    const aiDiff = this.ai.targetY - this.ai.y;
+    this.ai.y += Math.sign(aiDiff) * Math.min(Math.abs(aiDiff), aiSpeed * dt);
+    
+    // ── Ball movement ──
+    this.ball.x += this.ball.vx * dt;
+    this.ball.y += this.ball.vy * dt;
+    
+    // Trail
+    this.ballTrail.push({ x: this.ball.x, y: this.ball.y });
+    if (this.ballTrail.length > 12) this.ballTrail.shift();
+    
+    // Track speed
+    const speed = Math.sqrt(this.ball.vx ** 2 + this.ball.vy ** 2);
+    this.topSpeed = Math.max(this.topSpeed, Math.round(speed * 10));
+    
+    // Particle trail
+    if (speed > 6) {
+      this.particles.trail(this.ball.x, this.ball.y, speed > 10 ? '#ff6b6b' : '#00f0ff');
+    }
+    
+    // ── Wall bounce ──
+    if (this.ball.y - this.ball.radius < 0) {
+      this.ball.y = this.ball.radius;
+      this.ball.vy = Math.abs(this.ball.vy);
+      audio.wall();
+      this.particles.emit(this.ball.x, 0, 5, '#2a2a3a', 100, 0.3, 1.5);
+    }
+    if (this.ball.y + this.ball.radius > this.H) {
+      this.ball.y = this.H - this.ball.radius;
+      this.ball.vy = -Math.abs(this.ball.vy);
+      audio.wall();
+      this.particles.emit(this.ball.x, this.H, 5, '#2a2a3a', 100, 0.3, 1.5);
+    }
+    
+    // ── Paddle collision — Player ──
+    const px = 30;
+    if (this.ball.x - this.ball.radius < px + this.paddleW &&
+        this.ball.x + this.ball.radius > px &&
+        this.ball.y > this.player.y - this.paddleH / 2 - 4 &&
+        this.ball.y < this.player.y + this.paddleH / 2 + 4 &&
+        this.ball.vx < 0) {
+      
+      const hitPos = (this.ball.y - this.player.y) / (this.paddleH / 2);
+      const angle = hitPos * Math.PI / 3;
+      const speedMult = 1.05 + this.brain.adaptationLevel * 0.008;
+      
+      this.ball.speed = Math.min(15, this.ball.speed * speedMult);
+      this.ball.vx = Math.cos(angle) * this.ball.speed;
+      this.ball.vy = Math.sin(angle) * this.ball.speed;
+      this.ball.x = px + this.paddleW + this.ball.radius;
+      
+      // Effects
+      const isPowerHit = Math.abs(hitPos) > 0.7;
+      if (isPowerHit) {
+        audio.powerHit();
+        this.particles.emit(this.ball.x, this.ball.y, 20, '#00f0ff', 300, 0.5, 3);
+        this.shakeScreen();
+      } else {
+        audio.hit();
+        this.particles.emit(this.ball.x, this.ball.y, 10, '#00f0ff', 150, 0.4, 2);
+      }
+      
+      this.currentRally++;
+      this.longestRally = Math.max(this.longestRally, this.currentRally);
+      
+      // Record for AI learning
+      const normalizedY = this.ball.y / this.H;
+      const returnAngle = angle;
+      this.brain.recordHit(normalizedY, this.ball.speed, returnAngle);
+      
+      // Q-learning reward for AI based on result
+      const state = this.brain.getState(this.ball.y, this.ball.vy, this.ai.y, this.H);
+      this.brain.updateQ(state, 1, -0.1, state); // Ball returned, slight negative
+      
+      this.updateUI();
+    }
+    
+    // ── Paddle collision — AI ──
+    const ax = this.W - 30 - this.paddleW;
+    if (this.ball.x + this.ball.radius > ax &&
+        this.ball.x - this.ball.radius < ax + this.paddleW &&
+        this.ball.y > this.ai.y - this.paddleH / 2 - 4 &&
+        this.ball.y < this.ai.y + this.paddleH / 2 + 4 &&
+        this.ball.vx > 0) {
+      
+      const hitPos = (this.ball.y - this.ai.y) / (this.paddleH / 2);
+      const angle = Math.PI - hitPos * Math.PI / 3;
+      const speedMult = 1.05;
+      
+      this.ball.speed = Math.min(15, this.ball.speed * speedMult);
+      this.ball.vx = Math.cos(angle) * this.ball.speed;
+      this.ball.vy = Math.sin(angle) * this.ball.speed;
+      this.ball.x = ax - this.ball.radius;
+      
+      audio.hit();
+      this.particles.emit(this.ball.x, this.ball.y, 10, '#7b61ff', 150, 0.4, 2);
+      
+      this.currentRally++;
+      this.longestRally = Math.max(this.longestRally, this.currentRally);
+      
+      // Q-learning: AI successfully returned
+      const state = this.brain.getState(this.ball.y, this.ball.vy, this.ai.y, this.H);
+      this.brain.updateQ(state, 1, 0.5, state); // positive reward
+    }
+    
+    // ── Scoring ──
+    if (this.ball.x < -20) {
+      // AI scores
+      this.aiScore++;
+      this.winHistory.push(1);
+      this.rallyCount++;
+      audio.score(false);
+      this.particles.emit(30, this.ball.y, 30, '#ff6b6b', 250, 0.8, 3);
+      this.addLog('<span class="warn">AI scored!</span> Rally: ' + this.currentRally);
+      this.brain.setThought('Point won. Analyzing return pattern...');
+      
+      // Q-learning: big positive reward for AI
+      const state = this.brain.getState(this.ball.y, this.ball.vy, this.ai.y, this.H);
+      this.brain.updateQ(state, 1, 2.0, state);
+      
+      this.afterScore();
+    }
+    
+    if (this.ball.x > this.W + 20) {
+      // Player scores
+      this.playerScore++;
+      this.winHistory.push(0);
+      this.rallyCount++;
+      audio.score(true);
+      this.particles.emit(this.W - 30, this.ball.y, 30, '#4ade80', 250, 0.8, 3);
+      this.addLog('<span class="event">Player scored!</span> Rally: ' + this.currentRally);
+      
+      // Q-learning: negative reward for AI
+      const state = this.brain.getState(this.ball.y, this.ball.vy, this.ai.y, this.H);
+      this.brain.updateQ(state, 1, -2.0, state);
+      
+      this.brain.setThought('Point lost. Adjusting weights...');
+      this.afterScore();
+    }
+    
+    // Update particles
+    this.particles.update(dt / 60);
+    
+    // Periodic UI updates
+    if (Math.random() < 0.02) this.updateUI();
+  }
+
+  afterScore() {
+    this.round++;
+    
+    // Check for strategy adaptation notification
+    const oldLevel = this.brain.adaptationLevel;
+    const stratChanged = this.brain.updateStrategy();
+    
+    if (stratChanged) {
+      audio.adapt();
+      this.showToast(`AI Strategy: ${this.brain.strategy.toUpperCase()}`);
+      this.addLog(`<span class="adapt">Strategy → ${this.brain.strategy}</span>`);
+    }
+    
+    if (this.brain.adaptationLevel > oldLevel) {
+      this.showToast(`AI Leveled Up! LV.${this.brain.adaptationLevel}`);
+      this.addLog(`<span class="adapt">Adaptation LV.${this.brain.adaptationLevel}</span>`);
+    }
+    
+    this.updateUI();
+    this.updateScoreDisplay();
+    
+    // Reset ball after delay
+    setTimeout(() => {
+      if (this.running) this.resetBall(this.playerScore > this.aiScore ? 1 : -1);
+    }, 800);
+  }
+
+  // ─── Rendering ──────────────────────────────
+  render() {
+    const ctx = this.ctx;
+    const W = this.W, H = this.H;
+    
+    // Clear
+    ctx.fillStyle = '#0d0d14';
+    ctx.fillRect(0, 0, W, H);
+    
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.015)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    
+    // Center line
+    ctx.setLineDash([4, 8]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Ball glow
+    const speed = Math.sqrt(this.ball.vx ** 2 + this.ball.vy ** 2);
+    const glowSize = 20 + speed * 2;
+    const gradient = ctx.createRadialGradient(this.ball.x, this.ball.y, 0, this.ball.x, this.ball.y, glowSize);
+    const ballColor = speed > 10 ? '#ff6b6b' : speed > 7 ? '#facc15' : '#00f0ff';
+    gradient.addColorStop(0, ballColor + '40');
+    gradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(this.ball.x - glowSize, this.ball.y - glowSize, glowSize * 2, glowSize * 2);
+    
+    // Ball trail
+    for (let i = 0; i < this.ballTrail.length; i++) {
+      const t = this.ballTrail[i];
+      const alpha = (i / this.ballTrail.length) * 0.3;
+      ctx.fillStyle = ballColor;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, this.ball.radius * (i / this.ballTrail.length), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    
+    // Ball
+    ctx.fillStyle = ballColor;
+    ctx.shadowColor = ballColor;
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    // Player paddle
+    this.drawPaddle(ctx, 30, this.player.y, '#00f0ff', '#00f0ff');
+    
+    // AI paddle
+    this.drawPaddle(ctx, W - 30 - this.paddleW, this.ai.y, '#7b61ff', '#7b61ff');
+    
+    // AI prediction line (subtle)
+    if (this.brain.confidence > 0.3 && this.brain.totalHits > 5) {
+      const predY = this.brain.predictedY * H;
+      ctx.strokeStyle = 'rgba(123, 97, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 6]);
+      ctx.beginPath();
+      ctx.moveTo(W - 50, predY);
+      ctx.lineTo(W - 30 - this.paddleW - 10, predY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Small prediction indicator
+      ctx.fillStyle = 'rgba(123, 97, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(W - 50, predY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Particles
+    this.particles.draw(ctx);
+  }
+
+  drawPaddle(ctx, x, y, color, glowColor) {
+    const h = this.paddleH;
+    const w = this.paddleW;
+    const top = y - h / 2;
+    
+    // Glow
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 20;
+    
+    // Paddle body
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, top, w, h, 4);
+    ctx.fill();
+    
+    ctx.shadowBlur = 0;
+    
+    // Inner highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.roundRect(x + 2, top + 2, w - 4, h - 4, 3);
+    ctx.fill();
+  }
+
+  shakeScreen() {
+    const area = document.getElementById('game-area');
+    area.classList.add('shake');
+    setTimeout(() => area.classList.remove('shake'), 150);
+  }
+
+  // ─── UI Updates ─────────────────────────────
+  updateScoreDisplay() {
+    document.getElementById('playerScore').textContent = this.playerScore;
+    document.getElementById('aiScore').textContent = this.aiScore;
+    document.getElementById('round-indicator').textContent = `ROUND ${this.round}`;
+  }
+
+  updateUI() {
+    // AI thought
+    document.getElementById('aiThoughtText').textContent = this.brain.currentThought;
+    
+    // Strategy badge
+    const badge = document.getElementById('strategyBadge');
+    badge.className = `strategy-badge strategy-${this.brain.strategy}`;
+    const icons = { calibrating: '◈', defensive: '◇', aggressive: '◆', predictive: '⬡', adaptive: '⬢' };
+    document.getElementById('strategyIcon').textContent = icons[this.brain.strategy] || '◈';
+    document.getElementById('strategyName').textContent = this.brain.strategy.toUpperCase();
+    
+    // Confidence
+    const conf = Math.round(this.brain.confidence * 100);
+    document.getElementById('confidenceFill').style.width = conf + '%';
+    document.getElementById('confidenceValue').textContent = conf + '%';
+    
+    // Prediction indicator
+    const predEl = document.getElementById('prediction-indicator');
+    predEl.style.left = `calc(${this.brain.predictedY * 100}% - 4px)`;
+    
+    // Prediction accuracy
+    const predAcc = this.brain.totalPredictions > 0 
+      ? Math.round(this.brain.predictionAccuracy * 100) + '%' : '—';
+    document.getElementById('predAccuracy').textContent = `Acc: ${predAcc}`;
+    
+    // Stats
+    document.getElementById('statRallies').textContent = this.rallyCount;
+    document.getElementById('statLongest').textContent = this.longestRally;
+    document.getElementById('statTopSpeed').textContent = this.topSpeed;
+    if (this.brain.reactionTimes.length > 0) {
+      const avg = Math.round(this.brain.reactionTimes.reduce((a,b)=>a+b,0) / this.brain.reactionTimes.length);
+      document.getElementById('statReaction').textContent = avg;
+    }
+    
+    // Patterns
+    const patternsHTML = this.brain.getPatterns().map(p => 
+      `<div class="pattern-item"><span class="pattern-name">${p.name}</span><span class="pattern-value">${p.value}</span></div>`
+    ).join('');
+    document.getElementById('patterns-list').innerHTML = patternsHTML;
+    
+    // Tendencies
+    const tendHTML = this.brain.getTendencies().map(t =>
+      `<div class="pattern-item"><span class="pattern-name">${t.name}</span><span class="pattern-value">${t.value}</span></div>`
+    ).join('');
+    document.getElementById('tendency-list').innerHTML = tendHTML;
+    
+    // Adaptation level
+    const lvl = this.brain.adaptationLevel;
+    document.getElementById('adaptLevel').textContent = `LV.${lvl}`;
+    document.getElementById('adaptBar').style.width = `${(lvl / 10) * 100}%`;
+    const descs = ['Novice — Learning basics', 'Observer — Tracking patterns', 'Student — Forming strategies',
+      'Analyst — Recognizing tendencies', 'Tactician — Adapting actively', 'Expert — High prediction',
+      'Master — Anticipating moves', 'Savant — Deep pattern match', 'Oracle — Near-perfect reads',
+      'Nemesis — Fully adapted', 'Transcendent — Beyond'];
+    document.getElementById('adaptDesc').textContent = descs[Math.min(lvl, descs.length - 1)];
+    
+    // Speed dots
+    const speedLevel = Math.min(5, Math.floor(this.ball.speed / 3));
+    document.querySelectorAll('.speed-dot').forEach((dot, i) => {
+      dot.classList.toggle('active', i < speedLevel);
+    });
+    
+    // Heatmap
+    this.drawHeatmap();
+    
+    // Win rate chart
+    this.drawWinRate();
+    
+    // Neural weights
+    this.drawNeuralWeights();
+  }
+
+  drawHeatmap() {
+    const canvas = document.getElementById('heatmap-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.clientWidth * 2;
+    canvas.height = canvas.clientHeight * 2;
+    ctx.scale(2, 2);
+    
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const segW = w / this.brain.segments;
+    
+    const maxVal = Math.max(1, ...this.brain.positionHeatmap);
+    
+    for (let i = 0; i < this.brain.segments; i++) {
+      const intensity = this.brain.positionHeatmap[i] / maxVal;
+      const r = Math.round(intensity * 255);
+      const g = Math.round((1 - intensity) * 100);
+      const b = Math.round((1 - intensity) * 255);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.2 + intensity * 0.6})`;
+      ctx.fillRect(i * segW, 0, segW - 1, h);
+    }
+  }
+
+  drawWinRate() {
+    const canvas = document.getElementById('winrate-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.clientWidth * 2;
+    canvas.height = canvas.clientHeight * 2;
+    ctx.scale(2, 2);
+    
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(0, 0, w, h);
+    
+    if (this.winHistory.length < 2) {
+      ctx.fillStyle = '#6a6a8a';
+      ctx.font = '10px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText('Play more to see trends', w/2, h/2 + 3);
+      return;
+    }
+    
+    // Calculate rolling win rate
+    const windowSize = 5;
+    const rates = [];
+    for (let i = windowSize - 1; i < this.winHistory.length; i++) {
+      const slice = this.winHistory.slice(i - windowSize + 1, i + 1);
+      rates.push(slice.reduce((a,b) => a+b, 0) / slice.length);
+    }
+    
+    if (rates.length < 2) return;
+    
+    // 50% line
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(0, h/2);
+    ctx.lineTo(w, h/2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Draw line
+    ctx.beginPath();
+    ctx.strokeStyle = '#7b61ff';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < rates.length; i++) {
+      const x = (i / (rates.length - 1)) * w;
+      const y = (1 - rates[i]) * h;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    
+    // Fill under
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(123, 97, 255, 0.1)';
+    ctx.fill();
+    
+    // Labels
+    ctx.fillStyle = '#6a6a8a';
+    ctx.font = '8px JetBrains Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText('AI 100%', 2, 10);
+    ctx.fillText('AI 0%', 2, h - 2);
+  }
+
+  drawNeuralWeights() {
+    const canvas = document.getElementById('neural-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 248, 100);
+    
+    // Draw nodes
+    const layers = [4, 6, 6, 3]; // input, hidden, hidden, output
+    const layerX = [30, 90, 160, 220];
+    let weightIdx = 0;
+    
+    for (let l = 0; l < layers.length; l++) {
+      const n = layers[l];
+      for (let i = 0; i < n; i++) {
+        const y = 15 + (i / (n - 1 || 1)) * 70;
+        const x = layerX[l];
+        
+        // Connections to next layer
+        if (l < layers.length - 1) {
+          const nn = layers[l + 1];
+          for (let j = 0; j < nn; j++) {
+            const ny = 15 + (j / (nn - 1 || 1)) * 70;
+            const nx = layerX[l + 1];
+            const w = this.brain.weights[weightIdx % 24];
+            ctx.strokeStyle = `rgba(0, 240, 255, ${w * 0.4})`;
+            ctx.lineWidth = w * 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(nx, ny);
+            ctx.stroke();
+            weightIdx++;
+          }
+        }
+        
+        // Node
+        const activation = this.brain.weights[(l * 6 + i) % 24];
+        ctx.fillStyle = `rgba(123, 97, 255, ${0.3 + activation * 0.7})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 4 + activation * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  addLog(msg) {
+    const log = document.getElementById('eventLog');
+    const mins = Math.floor(this.gameTime / 60);
+    const secs = Math.floor(this.gameTime % 60);
+    const time = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    log.innerHTML = `<div class="log-entry"><span class="time">${time}</span> ${msg}</div>` + log.innerHTML;
+    // Keep only last 30
+    while (log.children.length > 30) log.removeChild(log.lastChild);
+  }
+
+  showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  initHeatmapCanvas() {
+    const canvas = document.getElementById('heatmap-canvas');
+    canvas.width = canvas.clientWidth * 2;
+    canvas.height = canvas.clientHeight * 2;
+  }
+
+  initWinrateCanvas() {
+    const canvas = document.getElementById('winrate-canvas');
+    canvas.width = canvas.clientWidth * 2;
+    canvas.height = canvas.clientHeight * 2;
+  }
+}
+
+// ─── Launch ───────────────────────────────────
+const game = new Game();
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('splash').classList.add('hidden');
+  setTimeout(() => {
+    document.getElementById('splash').style.display = 'none';
+    game.start();
+  }, 600);
+});
+
+// Also start on any key
+document.addEventListener('keydown', function startOnKey(e) {
+  if (e.key === ' ' || e.key === 'Enter') {
+    document.getElementById('startBtn').click();
+    document.removeEventListener('keydown', startOnKey);
+  }
+});
+</script>
+
+</body>
+</html>
