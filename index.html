@@ -1282,13 +1282,15 @@ class Game {
       this.ball.x, this.W, this.ball.vx
     );
     this.ai.targetY = Math.max(this.paddleH / 2, Math.min(this.H - this.paddleH / 2, aiTarget));
+    
+    // AI movement: speed-limited tracking with urgency when ball approaches
     const aiSpeed = this.brain.getSpeed();
     const aiDiff = this.ai.targetY - this.ai.y;
-    // Smooth interpolation for nearby, direct movement for far
-    if (Math.abs(aiDiff) < 20) {
-      this.ai.y += aiDiff * 0.2 * dt;
+    const maxMove = aiSpeed * dt;
+    if (Math.abs(aiDiff) <= maxMove) {
+      this.ai.y = this.ai.targetY;
     } else {
-      this.ai.y += Math.sign(aiDiff) * Math.min(Math.abs(aiDiff), aiSpeed * dt);
+      this.ai.y += Math.sign(aiDiff) * maxMove;
     }
     
     // ── Ball movement ──
@@ -1821,6 +1823,7 @@ class Game {
 
 // ─── Launch ───────────────────────────────────
 const game = new Game();
+window._game = game;
 
 document.getElementById('startBtn').addEventListener('click', () => {
   document.getElementById('splash').classList.add('hidden');
