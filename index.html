@@ -1014,66 +1014,76 @@ class AIBrain {
     return false;
   }
 
+  // Predict ball landing Y with proper bounce simulation
+  predictLandingY(ballX, ballY, ballVX, ballVY, targetX, canvasH) {
+    if (ballVX === 0) return ballY;
+    const timeToReach = (targetX - ballX) / ballVX;
+    if (timeToReach < 0) return ballY;
+    
+    let predY = ballY + ballVY * timeToReach;
+    
+    // Simulate bounces properly
+    const h = canvasH;
+    // Normalize to [0, 2h] period
+    if (predY < 0) predY = -predY;
+    predY = predY % (2 * h);
+    if (predY > h) predY = 2 * h - predY;
+    
+    return Math.max(0, Math.min(h, predY));
+  }
+
   // Get AI paddle target position
   getTargetY(ballY, ballVY, canvasH, ballX, canvasW, ballVX) {
     let targetY;
     
-    // Base: track ball
-    targetY = ballY;
-    
-    // If ball coming toward AI, predict landing position
+    // Always predict landing position when ball is coming toward AI
     if (ballVX > 0) {
-      const timeToReach = (canvasW - ballX) / Math.abs(ballVX);
-      let predY = ballY + ballVY * timeToReach;
-      
-      // Bounce prediction
-      while (predY < 0 || predY > canvasH) {
-        if (predY < 0) predY = -predY;
-        if (predY > canvasH) predY = 2 * canvasH - predY;
-      }
-      
-      targetY = predY;
+      const aiPaddleX = canvasW - 42; // approximate AI paddle x
+      targetY = this.predictLandingY(ballX, ballY, ballVX, ballVY, aiPaddleX, canvasH);
+    } else {
+      // Ball going away — use prediction or center
+      targetY = ballY;
     }
 
-    // Apply strategy modifiers
+    // Apply strategy modifiers (much smaller noise/bias)
     switch (this.strategy) {
       case 'calibrating':
-        // Slight delay/imperfection
-        targetY = targetY * 0.7 + (canvasH / 2) * 0.3;
+        // Small imperfection: 90% track, 10% center bias
+        targetY = targetY * 0.92 + (canvasH / 2) * 0.08;
         break;
         
       case 'defensive':
-        // Bias toward center, react slower
-        targetY = targetY * 0.85 + (canvasH / 2) * 0.15;
+        // Slight center bias
+        targetY = targetY * 0.95 + (canvasH / 2) * 0.05;
         break;
         
       case 'predictive':
-        // Use prediction to pre-position
-        if (ballVX < 0) { // Ball going toward player
-          targetY = this.predictedY * canvasH * 0.6 + (canvasH / 2) * 0.4;
+        // When ball going toward player, pre-position based on prediction
+        if (ballVX < 0) {
+          targetY = this.predictedY * canvasH * 0.5 + (canvasH / 2) * 0.5;
         }
+        // When ball coming toward us, use pure tracking (no modification)
         break;
         
       case 'aggressive':
-        // Try to return to spots player can't reach
-        // Offset from predicted player position
-        if (this.confidence > 0.5) {
+        // Try to position for angled returns
+        if (this.confidence > 0.5 && ballVX > 0) {
           const playerPredPos = this.predictedY * canvasH;
-          // Aim away from where player tends to be
-          const offset = (playerPredPos > canvasH / 2) ? -30 : 30;
-          targetY += offset * this.confidence;
+          const offset = (playerPredPos > canvasH / 2) ? -15 : 15;
+          targetY += offset * this.confidence * 0.5;
         }
         break;
         
       case 'adaptive':
-        // Mix of all strategies
-        const blend = this.predictedY * canvasH;
-        targetY = targetY * 0.6 + blend * 0.2 + (canvasH / 2) * 0.2;
+        if (ballVX < 0) {
+          const blend = this.predictedY * canvasH;
+          targetY = targetY * 0.5 + blend * 0.3 + (canvasH / 2) * 0.2;
+        }
         break;
     }
 
-    // Add slight imperfection based on inverse of adaptation level
-    const noise = (1 - this.adaptationLevel / 12) * 20;
+    // Add slight imperfection based on inverse of adaptation level (reduced noise)
+    const noise = (1 - this.adaptationLevel / 12) * 8;
     targetY += (Math.random() - 0.5) * noise;
 
     return Math.max(0, Math.min(canvasH, targetY));
@@ -1081,9 +1091,9 @@ class AIBrain {
 
   // AI paddle speed scaling
   getSpeed() {
-    const base = 4;
-    const levelBonus = this.adaptationLevel * 0.3;
-    const stratBonus = this.strategy === 'aggressive' ? 1 : this.strategy === 'predictive' ? 0.5 : 0;
+    const base = 6.5;
+    const levelBonus = this.adaptationLevel * 0.25;
+    const stratBonus = this.strategy === 'aggressive' ? 0.8 : this.strategy === 'predictive' ? 0.4 : 0;
     return base + levelBonus + stratBonus;
   }
 
@@ -1274,7 +1284,12 @@ class Game {
     this.ai.targetY = Math.max(this.paddleH / 2, Math.min(this.H - this.paddleH / 2, aiTarget));
     const aiSpeed = this.brain.getSpeed();
     const aiDiff = this.ai.targetY - this.ai.y;
-    this.ai.y += Math.sign(aiDiff) * Math.min(Math.abs(aiDiff), aiSpeed * dt);
+    // Smooth interpolation for nearby, direct movement for far
+    if (Math.abs(aiDiff) < 20) {
+      this.ai.y += aiDiff * 0.2 * dt;
+    } else {
+      this.ai.y += Math.sign(aiDiff) * Math.min(Math.abs(aiDiff), aiSpeed * dt);
+    }
     
     // ── Ball movement ──
     this.ball.x += this.ball.vx * dt;
